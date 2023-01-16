@@ -8,8 +8,8 @@ Check `How.md` if you don't know how to play.
 
 # Rock-Paper-Scissor
 
-To play this game type in your console `node rps.js`
+To play this game type in your console `node Rock-Paper-Scissor/rps.js`
 
 # Simple-Gun
 
-To play this game type in your console `node simplegun.js`
+To play this game type in your console `node SimpleGun/simplegun.js`
