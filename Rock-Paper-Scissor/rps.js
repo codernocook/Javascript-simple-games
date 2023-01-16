@@ -7,7 +7,7 @@ const settings = {
   "Win": 0,
   "Lose": 0
 };
-const settingsFile = require("./settings.json");
+const settingsFile = require("./database.json");
 
 // Import Database Storage
 settings["New"] = settingsFile["New"]
@@ -65,7 +65,7 @@ const rl = readline.createInterface({
 const gamecharacter = ["rock", "paper", "scissor"]
 
 function Save() {
-  fs.writeFileSync("./settings.json", JSON.stringify(settings));
+  fs.writeFileSync("./database.json", JSON.stringify(settings));
 }
 
 function Commands() {
