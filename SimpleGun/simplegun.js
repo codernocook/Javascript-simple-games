@@ -67,6 +67,7 @@ const gamecharacter = ["gun", "ammo", "shield"]
 // Match Varible
 let currentammo = 0;
 let botammo = 0;
+let IsMatch = false;
 
 function Save() {
   fs.writeFileSync("./database.json", JSON.stringify(settings));
@@ -91,19 +92,209 @@ function Commands() {
   });
 }
 
+// BotAI
+let gameposition = 0
+let lastplayeranswer = null
+let guntime = 0
+
+//Anti loop state
+let GunChooseTime = 0;
+let AmmoChooseTime = 0;
+let ShieldChooseTime = 0;
+
+/// Percent Chance
+function percent() {
+  const random = Math.floor(Math.random() * 10)
+
+  if (random < 5) {
+    return "Section"
+  } else if (random >= 5) {
+    return "Random"
+  }
+}
+///
+
 function StartGame() {
   rl.question(`\nYour Current Ammo: ${currentammo}\nEnemy Ammo: ${botammo}\n\nChoose your answer: [Gun/Ammo/Shield]: `, function(answerback) {
-    const botrandom = gamecharacter[Math.floor(Math.random() * gamecharacter.length)]
-    const botfrontend = botrandom.charAt(0).toUpperCase() + botrandom.slice(1);
+  //Clear old Match
+    if (IsMatch === false) {
+      gameposition = 0;
+      lastplayeranswer = null;
+      guntime = 0;
+      
+      GunChooseTime = 0;
+      AmmoChooseTime = 0;
+      ShieldChooseTime = 0;
+  
+      currentammo = 0;
+      botammo = 0;
+    }
+    IsMatch = true
+  ////
     const answer = answerback.toLowerCase().trim();
     const answerfrontend = answer.charAt(0).toUpperCase() + answer.slice(1);
       if (answer === "/c" || answer === "/cmds" || answer === "/command") return Commands();
+
+    //Bot ai setup
+    let botrandom = "none";
+
+    if (gameposition <= 0 && botrandom === "none") {
+      botrandom = "ammo"
+      AmmoChooseTime++;
+    }
+
+    gameposition++;
+
+    if (lastplayeranswer === "gun" && botrandom === "none") {
+      //they may shoot us one more time
+      botrandom = "shield"
+      ShieldChooseTime++;
+      
+      guntime++;
+      if (guntime > 2) {
+        //chose shield
+        botrandom = "shield"
+        ShieldChooseTime++;
+      } else if (currentammo - guntime <= 2) {
+        //getting chance
+        const percentrandomize = percent();
+
+        if (percentrandomize === "Section") {
+          botrandom = "ammo";
+          AmmoChooseTime++;
+        } else if (percentrandomize === "Random") {
+          botrandom = "shield";
+          ShieldChooseTime++;
+        }
+      }
+    }
+
+    if (lastplayeranswer === "ammo" && botrandom === "none") {
+      if (gameposition <= 0 && botrandom !== "none") {
+        botrandom = "ammo"
+        AmmoChooseTime++;
+      }
+      if (currentammo >= 1) {
+        botrandom = "shield"
+        ShieldChooseTime++;
+      }
+      if (currentammo > 2) {
+        const percentrandomize = percent();
+
+        if (percentrandomize === "Section") {
+          botrandom = "shield";
+          ShieldChooseTime++;
+        } else if (percentrandomize === "Random") {
+          // Tie checker
+          if (botammo > 0) {
+            botrandom = "shield";
+            ShieldChooseTime++;
+          } else {
+            botrandom = "gun";
+            GunChooseTime++;
+          }
+        }
+      }
+    }
+
+    if (lastplayeranswer === "shield" && botrandom === "none") {
+      if (currentammo > 0) {
+        // player may shoot
+        botrandom = "shield";
+        ShieldChooseTime++;
+      } else {
+        botrandom = "ammo"
+        AmmoChooseTime++;
+      }
+    }
+
+    // Check if loop
+    if (GunChooseTime >= 2) {
+      if (botammo <= 0) {
+        // choose shield to protect the bot
+        botrandom = "shield"
+        ShieldChooseTime++;
+      } else {
+        if (currentammo >= 1) {
+          // the player may shoot
+          botrandom = "gun"
+          GunChooseTime++;
+        } else {
+          botrandom = "ammo"
+          AmmoChooseTime++;
+        }
+      }
+    }
+
+    if (AmmoChooseTime >= 2) {
+      // bot may die from this
+
+      if (currentammo >= 1) {
+        // player may shoot, random percent chance of two option: gun, shield
+
+        const randompercent = percent();
+
+        if (randompercent === "Section") {
+          botrandom = "sheild"
+        } else if (randompercent === "Random") {
+          // Tie match may born from this
+          if (botammo >= 1) {
+            botrandom = "gun"
+            GunChooseTime++;
+          } else {
+            botrandom = "shield"
+            ShieldChooseTime++;
+          }
+        }
+      } else {
+        if (botammo >= 1) {
+          botrandom = "gun"
+          GunChooseTime++;
+        } else {
+          botrandom = "shield"
+          ShieldChooseTime++;
+        }
+      }
+    }
+
+    if (ShieldChooseTime >= 2) {
+      if (botammo >= 1) {
+        botrandom = "gun"
+        GunChooseTime++;
+      } else {
+        if (currentammo >= 1) {
+          const randompercent = percent();
+
+          if (randompercent === "Section") {
+            botrandom = "shield"
+            ShieldChooseTime++;
+          } else if (randompercent === "Random") {
+            // bot may lose from this
+            botrandom = "ammo"
+            AmmoChooseTime++;
+          }
+        }
+      }
+    }
+
+    // Generate bot frontend
+    let botfrontend;
+    if (botrandom !== "none") {
+      botfrontend = botrandom.charAt(0).toUpperCase() + botrandom.slice(1);
+    }
+
+    /////// Ended bot AI, below is checking
+
+
+      // For ai
+      lastplayeranswer = answer;
 
       // Next match when shield and gun
       if (answer === "shield" || (answer === "gun" && botrandom === "shield")) {
         console.log(`\nYou choose: ${answerfrontend} | Bot Choose: ${botfrontend}`);
         Save();
         StartGame();
+        return
       }
 
       // Increase ammo
@@ -118,6 +309,20 @@ function StartGame() {
         botammo++;
       }
 
+      // Degree
+    if (answer === "gun") {
+        if (currentammo >= 0) {
+          currentammo--;
+        }
+      }
+
+      if (botrandom === "gun") {
+        if (botammo >= 0) {
+          botammo--;
+        }
+      }
+    
+
       // Win
       if (answer === "gun" && botrandom === "ammo") {
         if (currentammo <= 0) {
@@ -125,23 +330,30 @@ function StartGame() {
           console.log(`\nYou need a ammo to shoot, you current ammo is ${currentammo}`)
           return StartGame();
         }
+        guntime++
+        IsMatch = false
         currentammo--;
         console.log(`\nYou win!\nYou choose: ${answerfrontend} | Bot Choose: ${botfrontend}`);
         settings["Win"]++;
+        gameposition = 0
         Save();
         Commands();
+        return
       }
 
       // Lose
       if (answer === "ammo" && botrandom === "gun") {
         if (botammo <= 0) {
-          return StartGame();
+         return StartGame();
         }
         botammo--;
+        IsMatch = false
         console.log(`\nYou lose, took an L.\nYou choose: ${answerfrontend} | Bot Choose: ${botfrontend}\n`);
         settings["Lose"]++;
+        gameposition = 0
         Save();
         Commands();
+        return
       }
 
       // Tie
@@ -155,10 +367,12 @@ function StartGame() {
           return StartGame();
         }
         botammo--;
-        console.log(`\nYou lose, took an L.\nYou choose: ${answerfrontend} | Bot Choose: ${botfrontend}\n`);
-        settings["Lose"]++;
+        IsMatch = false
+        console.log(`\nTie!\nYou choose: ${answerfrontend} | Bot Choose: ${botfrontend}\n`);
+        settings["Tie"]++;
         Save();
         Commands();
+        return
       }
   });
 }
